@@ -1,6 +1,5 @@
 # generate_report.py
 import os
-from typing import Any
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -28,21 +27,26 @@ def generate_report(cve: CVE) -> None:
     cve_heading.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     # Informations générales : Date de publication et score CVSS
+    report.add_heading("Informations sur la CVE", level=1)
     publication_date_paragraph = report.add_paragraph()
     publication_date_paragraph.add_run("Date de publication: ").bold = True
     publication_date_paragraph.add_run(f"{cve.publication_date}")
 
-    cvss_severity = cve.cvss_info.get("sévérité", "N/A")
     cvss_score_paragraph = report.add_paragraph()
     cvss_score_paragraph.add_run("Score CVSS: ").bold = True
-    cvss_score_paragraph.add_run(f"{cve.cvss_score} ({cvss_severity})")
+    cvss_score_paragraph.add_run(f"{cve.cvss_score} ({cve.cvss_info.get("Sévérité")})")
 
     # Affichage des autres informations CVSS s'il y en a
     if cve.cvss_info:
         for key, value in cve.cvss_info.items():
-            formatted_key = key.replace("_", " ").capitalize()
+            if key == "CIA":
+                continue
             cvss_info_paragraph = report.add_paragraph()
-            cvss_info_paragraph.add_run(f"{formatted_key}: ").bold = True
+            cvss_info_paragraph.add_run(f"{key}: ").bold = True
+            cvss_info_paragraph.add_run(f"{value}".lower())
+        for key, value in cve.cvss_info.get("CIA", {}).items():
+            cvss_info_paragraph = report.add_paragraph()
+            cvss_info_paragraph.add_run(f"{key}: ").bold = True
             cvss_info_paragraph.add_run(f"{value}".lower())
 
     # Résumé exécutif
@@ -90,7 +94,9 @@ def generate_report(cve: CVE) -> None:
     if cve.false_positive:
         # Tableau des machines "faux positifs"
         report.add_heading("Tableau faux positif sous conditions", level=1)
-        report.add_paragraph(f"{len(cve.false_positive)} machine(s) non détectée(s) sur le réseau depuis + d'un mois")
+        report.add_paragraph(
+            f"{len(cve.false_positive)} machine(s) non détectée(s) sur le réseau depuis + d'un mois"
+        )
 
         # Création d'un tableau avec 5 colonnes
         table = report.add_table(rows=1, cols=5)

@@ -54,6 +54,7 @@ class CVE:
         cve_id: str,
         cvss_score: float,
         description: str,
+        cve_types: [],
         publication_date: date,
         cvss_info: Dict[str, Any],
     ) -> None:
@@ -63,17 +64,18 @@ class CVE:
         :param cve_id: L'identifiant de la vulnérabilité.
         :param cvss_score: Le score CVSS associé à la vulnérabilité.
         :param description: Une description de la vulnérabilité.
+        :param cve_types: Le(s) type(s) de vulnérabilité
         :param publication_date: La date de publication de la vulnérabilité.
         :param cvss_info: Informations complémentaires sur le score CVSS.
         """
         self.cve_id = cve_id
         self.cvss_score = cvss_score
         self.description = description
+        self.cve_types = cve_types
         self.publication_date = publication_date
         self.cvss_info = cvss_info
         self.devices: List[Device] = []
         self.false_positive: List[Device] = []
-
 
     def add_device(self, device: Device) -> None:
         """
@@ -88,7 +90,6 @@ class CVE:
             self.false_positive.append(device)
         else:
             self.devices.append(device)
-
 
     def __str__(self) -> str:
         """

@@ -41,60 +41,55 @@ def get_iot_security_data(cve_id: str) -> Optional[Dict[str, Any]]:
 
 def get_cve_details(cve_id: str) -> Optional[Dict[str, Any]]:
     """
-    Récupère les détails d'une vulnérabilité depuis une source externe.
+    Récupère les détails de la vulnérabilité via l'API de IoT Security.
 
     :param cve_id: L'identifiant de la vulnérabilité (CVE).
     :return: Un dictionnaire contenant la date de publication, la description et les informations CVSS, ou None en cas d'erreur.
     """
-    url = f"https://vulnerability.circl.lu/api/cve/{cve_id}"
+    url = f"{BASE_URL}/pub/{API_VERSION}/vulnerability/list?customerid={CUSTOMER_ID}&groupby=vulnerability&name={cve_id}"
+
     try:
-        response = requests.get(url)
+        # Récupération des données via l'API de IoT Security
+        response = requests.get(url, headers=HEADERS)
         response.raise_for_status()
         data = response.json()
+        vulnerability = data.get("items", []).get("items", [])[0]
 
-        # Extraction et formatage de la date de publication
-        pub_date = data.get("cveMetadata", {}).get("datePublished")
-        if pub_date:
-            pub_date_obj = datetime.strptime(pub_date, "%Y-%m-%dT%H:%M:%S.%fZ")
-            pub_date_formatted = pub_date_obj.strftime("%d-%m-%Y")
-        else:
-            pub_date_formatted = "N/A"
+        # Extraction de la date de publication
+        publication_date = vulnerability.get("published_date")
+        pub_date_obj = datetime.strptime(publication_date, "%Y-%m-%dT%H:%M:%S.%f")
+        pub_date_formatted = pub_date_obj.strftime("%d-%m-%Y - %H:%M:%S")
 
-        # Extraction de la description en anglais
-        description_value = "N/A"
-        descriptions = data.get("containers", {}).get("cna", {}).get("descriptions", [])
-        for desc in descriptions:
-            if desc.get("lang") == "en":
-                description_value = desc.get("value", "N/A")
-                break
+        # Extraction de la description
+        description = vulnerability.get("description", "N/A")
 
-        # Extraction des informations liées au CVSS dans containers.adp
-        cvss_info = {}
-        adp_data = data.get("containers", {}).get("adp", [])
-        for container in adp_data:
-            metrics = container.get("metrics", [])
-            for metric in metrics:
-                if "cvssV3_1" in metric:
-                    cvss_data = metric["cvssV3_1"]
-                    cvss_info = {
-                        "vecteur_d'attaque": cvss_data.get("attackVector"),
-                        "sévérité": cvss_data.get("baseSeverity"),
-                        "interaction_utilisateur": cvss_data.get("userInteraction"),
-                        "complexité_attaque": cvss_data.get("attackComplexity"),
-                        "privilèges_requis": cvss_data.get("privilegesRequired"),
-                    }
-                    break
-            if cvss_info:
-                break
+        # Extraire le(s) type(s) de vulnérabilité
+        vulnerability_types = vulnerability.get("vulnerability_types", [])
+
+        # Extraction des informations CVSS
+        cvss_info = {
+            "Version CVSS": vulnerability.get("cvssVersion", "N/A"),
+            "Vecteur d'attaque": vulnerability.get("attack_vector", "N/A"),
+            "Sévérité": vulnerability.get("severity", "N/A"),
+            "Interaction utilisateur": vulnerability.get("user_interaction", "N/A"),
+            "Complexité attaque": vulnerability.get("attack_complexity", "N/A"),
+            "Privilèges requis": vulnerability.get("privileges_required", "N/A"),
+            "CIA": {
+                "Impact sur la confidentialité": vulnerability.get("confidentiality_impact", "N/A"),
+                "Impact sur l'intégrité": vulnerability.get("integrity_impact", "N/A"),
+                "Impact sur la disponibilité": vulnerability.get("availability_impact", "N/A"),
+            }
+        }
 
         details = {
             "Publication Date": pub_date_formatted,
-            "Description": description_value,
+            "Description": description,
+            "Vulnerability Types": vulnerability_types,
             "CVSS Info": cvss_info,
         }
         return details
     except requests.RequestException as e:
-        print(f"Failed to fetch CVE details: {e}")
+        print(f"Failed to fetch IoT CVE details: {e}")
         return None
 
 
@@ -120,6 +115,7 @@ def create_cve_from_data(data: Dict[str, Any]) -> Optional[CVE]:
         cve_id=cve_id,
         cvss_score=first_item.get("cvss_score", "N/A"),
         description=details.get("Description", "N/A"),
+        cve_types=details.get("Vulnerability Types", []),
         publication_date=details.get("Publication Date"),
         cvss_info=details.get("CVSS Info", {}),
     )
